@@ -1,137 +1,175 @@
-import Database from 'better-sqlite3';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import mysql from 'mysql2/promise';
+import dotenv from 'dotenv';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dbPath = path.join(__dirname, '..', 'data', 'property.db');
+dotenv.config();
 
-const db = new Database(dbPath);
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+const dbConfig = {
+  host: process.env.MYSQL_HOST || 'localhost',
+  port: Number(process.env.MYSQL_PORT || 3306),
+  user: process.env.MYSQL_USER || 'root',
+  password: process.env.MYSQL_PASSWORD || '',
+  database: process.env.MYSQL_DATABASE || 'property_management',
+  waitForConnections: true,
+  connectionLimit: 10,
+  charset: 'utf8mb4',
+};
 
-export function initDatabase() {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      username TEXT UNIQUE NOT NULL,
-      password TEXT NOT NULL,
-      name TEXT NOT NULL,
-      role TEXT NOT NULL DEFAULT 'admin',
-      phone TEXT,
-      created_at TEXT DEFAULT (datetime('now', 'localtime'))
-    );
+export const pool = mysql.createPool(dbConfig);
 
-    CREATE TABLE IF NOT EXISTS communities (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      address TEXT NOT NULL,
-      area REAL,
-      building_count INTEGER DEFAULT 0,
-      unit_count INTEGER DEFAULT 0,
-      contact_phone TEXT,
-      description TEXT,
-      created_at TEXT DEFAULT (datetime('now', 'localtime'))
-    );
-
-    CREATE TABLE IF NOT EXISTS buildings (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      community_id INTEGER NOT NULL,
-      name TEXT NOT NULL,
-      floors INTEGER NOT NULL DEFAULT 1,
-      units_per_floor INTEGER NOT NULL DEFAULT 1,
-      description TEXT,
-      created_at TEXT DEFAULT (datetime('now', 'localtime')),
-      FOREIGN KEY (community_id) REFERENCES communities(id) ON DELETE CASCADE
-    );
-
-    CREATE TABLE IF NOT EXISTS units (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      building_id INTEGER NOT NULL,
-      unit_number TEXT NOT NULL,
-      floor INTEGER NOT NULL,
-      area REAL NOT NULL,
-      type TEXT NOT NULL DEFAULT '住宅',
-      status TEXT NOT NULL DEFAULT '空置',
-      created_at TEXT DEFAULT (datetime('now', 'localtime')),
-      FOREIGN KEY (building_id) REFERENCES buildings(id) ON DELETE CASCADE
-    );
-
-    CREATE TABLE IF NOT EXISTS residents (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      unit_id INTEGER,
-      name TEXT NOT NULL,
-      phone TEXT NOT NULL,
-      id_card TEXT,
-      type TEXT NOT NULL DEFAULT '业主',
-      move_in_date TEXT,
-      status TEXT NOT NULL DEFAULT '在住',
-      created_at TEXT DEFAULT (datetime('now', 'localtime')),
-      FOREIGN KEY (unit_id) REFERENCES units(id) ON DELETE SET NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS fee_types (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      unit_price REAL NOT NULL,
-      unit TEXT NOT NULL DEFAULT '元/月',
-      description TEXT,
-      created_at TEXT DEFAULT (datetime('now', 'localtime'))
-    );
-
-    CREATE TABLE IF NOT EXISTS bills (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      unit_id INTEGER NOT NULL,
-      fee_type_id INTEGER NOT NULL,
-      amount REAL NOT NULL,
-      period TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT '未缴',
-      due_date TEXT,
-      paid_at TEXT,
-      created_at TEXT DEFAULT (datetime('now', 'localtime')),
-      FOREIGN KEY (unit_id) REFERENCES units(id) ON DELETE CASCADE,
-      FOREIGN KEY (fee_type_id) REFERENCES fee_types(id)
-    );
-
-    CREATE TABLE IF NOT EXISTS repair_orders (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      unit_id INTEGER,
-      resident_id INTEGER,
-      title TEXT NOT NULL,
-      description TEXT,
-      category TEXT NOT NULL DEFAULT '其他',
-      priority TEXT NOT NULL DEFAULT '普通',
-      status TEXT NOT NULL DEFAULT '待处理',
-      handler TEXT,
-      result TEXT,
-      created_at TEXT DEFAULT (datetime('now', 'localtime')),
-      completed_at TEXT,
-      FOREIGN KEY (unit_id) REFERENCES units(id) ON DELETE SET NULL,
-      FOREIGN KEY (resident_id) REFERENCES residents(id) ON DELETE SET NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS announcements (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      title TEXT NOT NULL,
-      content TEXT NOT NULL,
-      type TEXT NOT NULL DEFAULT '通知',
-      author TEXT,
-      is_pinned INTEGER DEFAULT 0,
-      created_at TEXT DEFAULT (datetime('now', 'localtime'))
-    );
-
-    CREATE TABLE IF NOT EXISTS parking_spaces (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      community_id INTEGER NOT NULL,
-      space_number TEXT NOT NULL,
-      type TEXT NOT NULL DEFAULT '地上',
-      status TEXT NOT NULL DEFAULT '空闲',
-      unit_id INTEGER,
-      monthly_fee REAL DEFAULT 0,
-      created_at TEXT DEFAULT (datetime('now', 'localtime')),
-      FOREIGN KEY (community_id) REFERENCES communities(id) ON DELETE CASCADE,
-      FOREIGN KEY (unit_id) REFERENCES units(id) ON DELETE SET NULL
-    );
-  `);
+export async function query<T = mysql.RowDataPacket>(
+  sql: string,
+  params: (string | number | null)[] = []
+): Promise<T[]> {
+  const [rows] = await pool.query<mysql.RowDataPacket[]>(sql, params);
+  return rows as T[];
 }
 
-export default db;
+export async function get<T = mysql.RowDataPacket>(
+  sql: string,
+  params: (string | number | null)[] = []
+): Promise<T | undefined> {
+  const rows = await query<T>(sql, params);
+  return rows[0];
+}
+
+export async function run(
+  sql: string,
+  params: (string | number | null)[] = []
+): Promise<{ insertId: number; affectedRows: number }> {
+  const [result] = await pool.execute(sql, params);
+  const header = result as mysql.ResultSetHeader;
+  return { insertId: header.insertId, affectedRows: header.affectedRows };
+}
+
+async function ensureDatabase() {
+  const { database, ...baseConfig } = dbConfig;
+  const connection = await mysql.createConnection(baseConfig);
+  await connection.query(
+    `CREATE DATABASE IF NOT EXISTS \`${database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
+  );
+  await connection.end();
+}
+
+export async function initDatabase() {
+  await ensureDatabase();
+
+  const tables = [
+    `CREATE TABLE IF NOT EXISTS users (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      username VARCHAR(50) UNIQUE NOT NULL,
+      password VARCHAR(255) NOT NULL,
+      name VARCHAR(100) NOT NULL,
+      role VARCHAR(20) NOT NULL DEFAULT 'admin',
+      phone VARCHAR(20),
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+    `CREATE TABLE IF NOT EXISTS communities (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(100) NOT NULL,
+      address VARCHAR(255) NOT NULL,
+      area DOUBLE,
+      building_count INT DEFAULT 0,
+      unit_count INT DEFAULT 0,
+      contact_phone VARCHAR(20),
+      description TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+    `CREATE TABLE IF NOT EXISTS buildings (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      community_id INT NOT NULL,
+      name VARCHAR(100) NOT NULL,
+      floors INT NOT NULL DEFAULT 1,
+      units_per_floor INT NOT NULL DEFAULT 1,
+      description TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (community_id) REFERENCES communities(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+    `CREATE TABLE IF NOT EXISTS units (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      building_id INT NOT NULL,
+      unit_number VARCHAR(20) NOT NULL,
+      floor INT NOT NULL,
+      area DOUBLE NOT NULL,
+      type VARCHAR(20) NOT NULL DEFAULT '住宅',
+      status VARCHAR(20) NOT NULL DEFAULT '空置',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (building_id) REFERENCES buildings(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+    `CREATE TABLE IF NOT EXISTS residents (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      unit_id INT,
+      name VARCHAR(50) NOT NULL,
+      phone VARCHAR(20) NOT NULL,
+      id_card VARCHAR(20),
+      type VARCHAR(20) NOT NULL DEFAULT '业主',
+      move_in_date VARCHAR(20),
+      status VARCHAR(20) NOT NULL DEFAULT '在住',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (unit_id) REFERENCES units(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+    `CREATE TABLE IF NOT EXISTS fee_types (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(100) NOT NULL,
+      unit_price DOUBLE NOT NULL,
+      \`unit\` VARCHAR(50) NOT NULL DEFAULT '元/月',
+      description TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+    `CREATE TABLE IF NOT EXISTS bills (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      unit_id INT NOT NULL,
+      fee_type_id INT NOT NULL,
+      amount DOUBLE NOT NULL,
+      period VARCHAR(20) NOT NULL,
+      status VARCHAR(20) NOT NULL DEFAULT '未缴',
+      due_date VARCHAR(20),
+      paid_at VARCHAR(30),
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (unit_id) REFERENCES units(id) ON DELETE CASCADE,
+      FOREIGN KEY (fee_type_id) REFERENCES fee_types(id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+    `CREATE TABLE IF NOT EXISTS repair_orders (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      unit_id INT,
+      resident_id INT,
+      title VARCHAR(200) NOT NULL,
+      description TEXT,
+      category VARCHAR(20) NOT NULL DEFAULT '其他',
+      priority VARCHAR(20) NOT NULL DEFAULT '普通',
+      status VARCHAR(20) NOT NULL DEFAULT '待处理',
+      handler VARCHAR(50),
+      \`result\` TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      completed_at VARCHAR(30),
+      FOREIGN KEY (unit_id) REFERENCES units(id) ON DELETE SET NULL,
+      FOREIGN KEY (resident_id) REFERENCES residents(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+    `CREATE TABLE IF NOT EXISTS announcements (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      title VARCHAR(200) NOT NULL,
+      content TEXT NOT NULL,
+      type VARCHAR(20) NOT NULL DEFAULT '通知',
+      author VARCHAR(50),
+      is_pinned TINYINT(1) DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+    `CREATE TABLE IF NOT EXISTS parking_spaces (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      community_id INT NOT NULL,
+      space_number VARCHAR(20) NOT NULL,
+      type VARCHAR(20) NOT NULL DEFAULT '地上',
+      status VARCHAR(20) NOT NULL DEFAULT '空闲',
+      unit_id INT,
+      monthly_fee DOUBLE DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (community_id) REFERENCES communities(id) ON DELETE CASCADE,
+      FOREIGN KEY (unit_id) REFERENCES units(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+  ];
+
+  for (const sql of tables) {
+    await pool.query(sql);
+  }
+}
+
+export default pool;

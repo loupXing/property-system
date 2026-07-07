@@ -13,8 +13,6 @@ import announcementRoutes from './routes/announcements.js';
 import parkingRoutes from './routes/parking.js';
 import dashboardRoutes from './routes/dashboard.js';
 
-initDatabase();
-
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -38,6 +36,16 @@ app.use('/api/repairs', repairRoutes);
 app.use('/api/announcements', announcementRoutes);
 app.use('/api/parking', parkingRoutes);
 
-app.listen(PORT, () => {
-  console.log(`物业管理系统后端运行在 http://localhost:${PORT}`);
-});
+async function start() {
+  try {
+    await initDatabase();
+    app.listen(PORT, () => {
+      console.log(`物业管理系统后端运行在 http://localhost:${PORT}`);
+    });
+  } catch (err) {
+    console.error('启动失败:', err instanceof Error ? err.message : err);
+    process.exit(1);
+  }
+}
+
+start();
