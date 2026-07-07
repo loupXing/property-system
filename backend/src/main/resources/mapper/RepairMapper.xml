@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.property.mapper.RepairMapper">
+    <select id="findAll" resultType="com.property.entity.RepairOrder">
+        SELECT ro.*, u.unit_number, b.name AS building_name, c.name AS community_name, r.name AS resident_name
+        FROM repair_orders ro
+        LEFT JOIN units u ON ro.unit_id = u.id
+        LEFT JOIN buildings b ON u.building_id = b.id
+        LEFT JOIN communities c ON b.community_id = c.id
+        LEFT JOIN residents r ON ro.resident_id = r.id
+        <where>
+            <if test="status != null and status != ''">AND ro.status = #{status}</if>
+            <if test="category != null and category != ''">AND ro.category = #{category}</if>
+        </where>
+        ORDER BY ro.id DESC
+    </select>
+    <select id="findById" resultType="com.property.entity.RepairOrder">
+        SELECT * FROM repair_orders WHERE id = #{id}
+    </select>
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO repair_orders (unit_id, resident_id, title, description, category, priority)
+        VALUES (#{unitId}, #{residentId}, #{title}, #{description}, #{category}, #{priority})
+    </insert>
+    <update id="update">
+        UPDATE repair_orders SET status=#{status}, handler=#{handler}, result=#{result},
+        completed_at=#{completedAt} WHERE id=#{id}
+    </update>
+    <delete id="deleteById">
+        DELETE FROM repair_orders WHERE id = #{id}
+    </delete>
+    <select id="findRecent" resultType="com.property.entity.RepairOrder">
+        SELECT ro.*, u.unit_number FROM repair_orders ro
+        LEFT JOIN units u ON ro.unit_id = u.id
+        ORDER BY ro.id DESC LIMIT #{limit}
+    </select>
+</mapper>

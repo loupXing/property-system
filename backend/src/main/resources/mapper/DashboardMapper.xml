@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.property.mapper.DashboardMapper">
+    <select id="findRecentBills" resultType="com.property.entity.Bill">
+        SELECT bl.*, u.unit_number, ft.name AS fee_type_name FROM bills bl
+        JOIN units u ON bl.unit_id = u.id
+        JOIN fee_types ft ON bl.fee_type_id = ft.id
+        ORDER BY bl.id DESC LIMIT #{limit}
+    </select>
+</mapper>

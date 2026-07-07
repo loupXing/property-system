@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.property.mapper.AnnouncementMapper">
+    <select id="findAll" resultType="com.property.entity.Announcement">
+        SELECT * FROM announcements ORDER BY is_pinned DESC, id DESC
+    </select>
+    <select id="findById" resultType="com.property.entity.Announcement">
+        SELECT * FROM announcements WHERE id = #{id}
+    </select>
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO announcements (title, content, type, author, is_pinned)
+        VALUES (#{title}, #{content}, #{type}, #{author}, #{isPinned})
+    </insert>
+    <update id="update">
+        UPDATE announcements SET title=#{title}, content=#{content}, type=#{type},
+        author=#{author}, is_pinned=#{isPinned} WHERE id=#{id}
+    </update>
+    <delete id="deleteById">
+        DELETE FROM announcements WHERE id = #{id}
+    </delete>
+</mapper>

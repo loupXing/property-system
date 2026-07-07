@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.property.mapper.ResidentMapper">
+    <select id="findAll" resultType="com.property.entity.Resident">
+        SELECT r.*, u.unit_number, b.name AS building_name, c.name AS community_name
+        FROM residents r
+        LEFT JOIN units u ON r.unit_id = u.id
+        LEFT JOIN buildings b ON u.building_id = b.id
+        LEFT JOIN communities c ON b.community_id = c.id
+        <where>
+            <if test="unitId != null">AND r.unit_id = #{unitId}</if>
+            <if test="status != null and status != ''">AND r.status = #{status}</if>
+        </where>
+        ORDER BY r.id DESC
+    </select>
+    <select id="findById" resultType="com.property.entity.Resident">
+        SELECT * FROM residents WHERE id = #{id}
+    </select>
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO residents (unit_id, name, phone, id_card, type, move_in_date, status)
+        VALUES (#{unitId}, #{name}, #{phone}, #{idCard}, #{type}, #{moveInDate}, #{status})
+    </insert>
+    <update id="update">
+        UPDATE residents SET unit_id=#{unitId}, name=#{name}, phone=#{phone}, id_card=#{idCard},
+        type=#{type}, move_in_date=#{moveInDate}, status=#{status} WHERE id=#{id}
+    </update>
+    <delete id="deleteById">
+        DELETE FROM residents WHERE id = #{id}
+    </delete>
+</mapper>

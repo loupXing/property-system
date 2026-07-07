@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.property.mapper.FeeMapper">
+    <select id="findAllTypes" resultType="com.property.entity.FeeType">
+        SELECT * FROM fee_types ORDER BY id
+    </select>
+    <insert id="insertType" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO fee_types (name, unit_price, unit, description)
+        VALUES (#{name}, #{unitPrice}, #{unit}, #{description})
+    </insert>
+    <select id="findAllBills" resultType="com.property.entity.Bill">
+        SELECT bl.*, u.unit_number, b.name AS building_name, c.name AS community_name, ft.name AS fee_type_name
+        FROM bills bl
+        JOIN units u ON bl.unit_id = u.id
+        JOIN buildings b ON u.building_id = b.id
+        JOIN communities c ON b.community_id = c.id
+        JOIN fee_types ft ON bl.fee_type_id = ft.id
+        <where>
+            <if test="status != null and status != ''">AND bl.status = #{status}</if>
+            <if test="unitId != null">AND bl.unit_id = #{unitId}</if>
+        </where>
+        ORDER BY bl.id DESC
+    </select>
+    <select id="findBillById" resultType="com.property.entity.Bill">
+        SELECT * FROM bills WHERE id = #{id}
+    </select>
+    <insert id="insertBill" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO bills (unit_id, fee_type_id, amount, period, due_date)
+        VALUES (#{unitId}, #{feeTypeId}, #{amount}, #{period}, #{dueDate})
+    </insert>
+    <update id="payBill">
+        UPDATE bills SET status = '已缴', paid_at = #{paidAt} WHERE id = #{id}
+    </update>
+    <delete id="deleteBill">
+        DELETE FROM bills WHERE id = #{id}
+    </delete>
+    <select id="countUnpaidAmount" resultType="map">
+        SELECT COALESCE(SUM(amount), 0) AS total FROM bills WHERE status = '未缴'
+    </select>
+    <select id="countPaidAmount" resultType="map">
+        SELECT COALESCE(SUM(amount), 0) AS total FROM bills WHERE status = '已缴'
+    </select>
+</mapper>

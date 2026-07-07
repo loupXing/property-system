@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.property.mapper.CommunityMapper">
+    <select id="findAllWithStats" resultType="com.property.entity.Community">
+        SELECT c.*,
+            (SELECT COUNT(*) FROM buildings WHERE community_id = c.id) AS building_count,
+            (SELECT COUNT(*) FROM units u JOIN buildings b ON u.building_id = b.id WHERE b.community_id = c.id) AS unit_count
+        FROM communities c ORDER BY c.id DESC
+    </select>
+    <select id="findById" resultType="com.property.entity.Community">
+        SELECT * FROM communities WHERE id = #{id}
+    </select>
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO communities (name, address, area, contact_phone, description)
+        VALUES (#{name}, #{address}, #{area}, #{contactPhone}, #{description})
+    </insert>
+    <update id="update">
+        UPDATE communities SET name=#{name}, address=#{address}, area=#{area},
+        contact_phone=#{contactPhone}, description=#{description} WHERE id=#{id}
+    </update>
+    <delete id="deleteById">
+        DELETE FROM communities WHERE id = #{id}
+    </delete>
+</mapper>
