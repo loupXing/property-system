@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.property.mapper.UnitMapper">
+    <select id="findAll" resultType="com.property.entity.Unit">
+        SELECT u.*, b.name AS building_name, c.name AS community_name,
+            (SELECT name FROM residents WHERE unit_id = u.id AND status = '在住' LIMIT 1) AS resident_name
+        FROM units u
+        JOIN buildings b ON u.building_id = b.id
+        JOIN communities c ON b.community_id = c.id
+        <where>
+            <if test="communityId != null">AND c.id = #{communityId}</if>
+            <if test="buildingId != null">AND u.building_id = #{buildingId}</if>
+            <if test="status != null and status != ''">AND u.status = #{status}</if>
+        </where>
+        ORDER BY u.id DESC
+    </select>
+    <select id="findById" resultType="com.property.entity.Unit">
+        SELECT * FROM units WHERE id = #{id}
+    </select>
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO units (building_id, unit_number, floor, area, type, status)
+        VALUES (#{buildingId}, #{unitNumber}, #{floor}, #{area}, #{type}, #{status})
+    </insert>
+    <update id="update">
+        UPDATE units SET unit_number=#{unitNumber}, floor=#{floor}, area=#{area},
+        type=#{type}, status=#{status} WHERE id=#{id}
+    </update>
+    <update id="updateStatus">
+        UPDATE units SET status = #{status} WHERE id = #{id}
+    </update>
+    <delete id="deleteById">
+        DELETE FROM units WHERE id = #{id}
+    </delete>
+</mapper>
