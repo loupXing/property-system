@@ -24,9 +24,10 @@ public class ResidentController {
     }
 
     @GetMapping
-    public List<Resident> list(@RequestParam(required = false) Integer unit_id,
+    public List<Resident> list(@RequestParam(required = false) Integer community_id,
+                               @RequestParam(required = false) Integer unit_id,
                                @RequestParam(required = false) String status) {
-        return residentMapper.findAll(unit_id, status);
+        return residentMapper.findAll(community_id, unit_id, status);
     }
 
     @PostMapping

@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Table, Button, Modal, Form, Input, InputNumber, Select, Space, Popconfirm, message } from 'antd';
+import { Table, Button, Modal, Form, Input, InputNumber, Space, Popconfirm, message } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import api from '../api';
+import { useCommunityFilter } from '../hooks/useCommunityFilter';
+import CommunityFilter from '../components/CommunityFilter';
 
 interface Building {
   id: number;
@@ -14,25 +16,23 @@ interface Building {
   description: string;
 }
 
-interface Community { id: number; name: string; }
-
 export default function Buildings() {
+  const { communityId, setCommunityId, options, loading: communityLoading } = useCommunityFilter();
   const [data, setData] = useState<Building[]>([]);
-  const [communities, setCommunities] = useState<Community[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Building | null>(null);
   const [form] = Form.useForm();
 
   const fetchData = () => {
+    if (!communityId) return;
     setLoading(true);
-    api.get('/buildings').then(res => setData(res.data)).finally(() => setLoading(false));
+    api.get('/buildings', { params: { community_id: communityId } })
+      .then(res => setData(res.data))
+      .finally(() => setLoading(false));
   };
 
-  useEffect(() => {
-    fetchData();
-    api.get('/communities').then(res => setCommunities(res.data));
-  }, []);
+  useEffect(() => { fetchData(); }, [communityId]);
 
   const handleSubmit = async () => {
     const values = await form.validateFields();
@@ -41,7 +41,7 @@ export default function Buildings() {
         await api.put(`/buildings/${editing.id}`, values);
         message.success('更新成功');
       } else {
-        await api.post('/buildings', values);
+        await api.post('/buildings', { ...values, community_id: communityId });
         message.success('创建成功');
       }
       setModalOpen(false);
@@ -54,7 +54,6 @@ export default function Buildings() {
   };
 
   const columns = [
-    { title: '所属小区', dataIndex: 'community_name', key: 'community_name' },
     { title: '楼栋名称', dataIndex: 'name', key: 'name' },
     { title: '楼层数', dataIndex: 'floors', key: 'floors' },
     { title: '每层户数', dataIndex: 'units_per_floor', key: 'units_per_floor' },
@@ -75,18 +74,16 @@ export default function Buildings() {
   return (
     <div>
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div><h2>楼栋管理</h2><p>管理各小区的楼栋信息</p></div>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditing(null); form.resetFields(); setModalOpen(true); }}>新增楼栋</Button>
+        <div><h2>楼栋管理</h2><p>按小区管理楼栋信息</p></div>
+        <Space>
+          <CommunityFilter value={communityId} onChange={setCommunityId} options={options} loading={communityLoading} />
+          <Button type="primary" icon={<PlusOutlined />} disabled={!communityId} onClick={() => { setEditing(null); form.resetFields(); setModalOpen(true); }}>新增楼栋</Button>
+        </Space>
       </div>
       <Table columns={columns} dataSource={data} rowKey="id" loading={loading} />
 
       <Modal title={editing ? '编辑楼栋' : '新增楼栋'} open={modalOpen} onOk={handleSubmit} onCancel={() => { setModalOpen(false); setEditing(null); }} destroyOnClose>
         <Form form={form} layout="vertical">
-          {!editing && (
-            <Form.Item name="community_id" label="所属小区" rules={[{ required: true }]}>
-              <Select placeholder="选择小区" options={communities.map(c => ({ value: c.id, label: c.name }))} />
-            </Form.Item>
-          )}
           <Form.Item name="name" label="楼栋名称" rules={[{ required: true }]}>
             <Input placeholder="如：1号楼" />
           </Form.Item>

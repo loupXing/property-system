@@ -7,7 +7,9 @@ import java.util.List;
 
 @Mapper
 public interface RepairMapper {
-    List<RepairOrder> findAll(@Param("status") String status, @Param("category") String category);
+    List<RepairOrder> findAll(@Param("communityId") Integer communityId,
+                              @Param("status") String status,
+                              @Param("category") String category);
     RepairOrder findById(Integer id);
     int insert(RepairOrder order);
     int update(RepairOrder order);

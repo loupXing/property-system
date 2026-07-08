@@ -39,9 +39,10 @@ public class FeeController {
     }
 
     @GetMapping("/bills")
-    public List<Bill> listBills(@RequestParam(required = false) String status,
+    public List<Bill> listBills(@RequestParam(required = false) Integer community_id,
+                                @RequestParam(required = false) String status,
                                 @RequestParam(required = false) Integer unit_id) {
-        return feeMapper.findAllBills(status, unit_id);
+        return feeMapper.findAllBills(community_id, status, unit_id);
     }
 
     @PostMapping("/bills")

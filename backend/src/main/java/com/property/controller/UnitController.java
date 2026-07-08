@@ -21,9 +21,10 @@ public class UnitController {
     }
 
     @GetMapping
-    public List<Unit> list(@RequestParam(required = false) Integer building_id,
+    public List<Unit> list(@RequestParam(required = false) Integer community_id,
+                           @RequestParam(required = false) Integer building_id,
                            @RequestParam(required = false) String status) {
-        return unitMapper.findAll(building_id, status);
+        return unitMapper.findAll(community_id, building_id, status);
     }
 
     @PostMapping

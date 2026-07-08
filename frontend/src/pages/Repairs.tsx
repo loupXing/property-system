@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { Table, Button, Modal, Form, Input, Select, Tag, Space, Popconfirm, message } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import api from '../api';
+import { useCommunityFilter } from '../hooks/useCommunityFilter';
+import CommunityFilter from '../components/CommunityFilter';
 
 interface RepairOrder {
   id: number;
@@ -13,6 +15,7 @@ interface RepairOrder {
   handler: string;
   result: string;
   unit_number: string;
+  building_name: string;
   community_name: string;
   resident_name: string;
   created_at: string;
@@ -25,6 +28,7 @@ const statusColors: Record<string, string> = { '待处理': 'orange', '处理中
 const priorityColors: Record<string, string> = { '紧急': 'red', '普通': 'default' };
 
 export default function Repairs() {
+  const { communityId, setCommunityId, options, loading: communityLoading } = useCommunityFilter();
   const [data, setData] = useState<RepairOrder[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
   const [loading, setLoading] = useState(false);
@@ -36,15 +40,20 @@ export default function Repairs() {
   const [handleForm] = Form.useForm();
 
   const fetchData = () => {
+    if (!communityId) return;
     setLoading(true);
-    const params = filterStatus ? { status: filterStatus } : {};
+    const params: Record<string, string | number> = { community_id: communityId };
+    if (filterStatus) params.status = filterStatus;
     api.get('/repairs', { params }).then(res => setData(res.data)).finally(() => setLoading(false));
   };
 
-  useEffect(() => {
-    fetchData();
-    api.get('/units').then(res => setUnits(res.data));
-  }, [filterStatus]);
+  const fetchUnits = () => {
+    if (!communityId) return;
+    api.get('/units', { params: { community_id: communityId } }).then(res => setUnits(res.data));
+  };
+
+  useEffect(() => { fetchUnits(); }, [communityId]);
+  useEffect(() => { fetchData(); }, [communityId, filterStatus]);
 
   const handleCreate = async () => {
     const values = await createForm.validateFields();
@@ -67,8 +76,8 @@ export default function Repairs() {
 
   const columns = [
     { title: '标题', dataIndex: 'title', key: 'title', ellipsis: true },
-    { title: '小区', dataIndex: 'community_name', key: 'community_name' },
-    { title: '房号', dataIndex: 'unit_number', key: 'unit_number' },
+    { title: '楼栋', dataIndex: 'building_name', key: 'building_name', render: (v: string) => v || '-' },
+    { title: '房号', dataIndex: 'unit_number', key: 'unit_number', render: (v: string) => v || '-' },
     { title: '类别', dataIndex: 'category', key: 'category' },
     { title: '优先级', dataIndex: 'priority', key: 'priority', render: (p: string) => <Tag color={priorityColors[p]}>{p}</Tag> },
     { title: '状态', dataIndex: 'status', key: 'status', render: (s: string) => <Tag color={statusColors[s]}>{s}</Tag> },
@@ -96,11 +105,12 @@ export default function Repairs() {
   return (
     <div>
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div><h2>报修工单</h2><p>管理住户报修请求及处理进度</p></div>
-        <Space>
+        <div><h2>报修工单</h2><p>按小区管理住户报修请求及处理进度</p></div>
+        <Space wrap>
+          <CommunityFilter value={communityId} onChange={setCommunityId} options={options} loading={communityLoading} />
           <Select allowClear placeholder="筛选状态" style={{ width: 120 }} value={filterStatus} onChange={setFilterStatus}
             options={[{ value: '待处理', label: '待处理' }, { value: '处理中', label: '处理中' }, { value: '已完成', label: '已完成' }]} />
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => { createForm.resetFields(); setCreateOpen(true); }}>新建工单</Button>
+          <Button type="primary" icon={<PlusOutlined />} disabled={!communityId} onClick={() => { createForm.resetFields(); setCreateOpen(true); }}>新建工单</Button>
         </Space>
       </div>
       <Table columns={columns} dataSource={data} rowKey="id" loading={loading} />
@@ -112,7 +122,7 @@ export default function Repairs() {
           </Form.Item>
           <Form.Item name="unit_id" label="房屋">
             <Select allowClear showSearch optionFilterProp="label" placeholder="选择房屋"
-              options={units.map(u => ({ value: u.id, label: `${u.community_name} ${u.building_name} ${u.unit_number}` }))} />
+              options={units.map(u => ({ value: u.id, label: `${u.building_name} ${u.unit_number}` }))} />
           </Form.Item>
           <Form.Item name="category" label="类别">
             <Select options={['水电', '门窗', '电梯', '管道', '其他'].map(v => ({ value: v, label: v }))} />

@@ -11,7 +11,9 @@ import java.util.Map;
 public interface FeeMapper {
     List<FeeType> findAllTypes();
     int insertType(FeeType feeType);
-    List<Bill> findAllBills(@Param("status") String status, @Param("unitId") Integer unitId);
+    List<Bill> findAllBills(@Param("communityId") Integer communityId,
+                            @Param("status") String status,
+                            @Param("unitId") Integer unitId);
     Bill findBillById(Integer id);
     int insertBill(Bill bill);
     int payBill(@Param("id") Integer id, @Param("paidAt") String paidAt);

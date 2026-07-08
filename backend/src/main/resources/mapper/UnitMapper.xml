@@ -8,6 +8,7 @@
         JOIN buildings b ON u.building_id = b.id
         JOIN communities c ON b.community_id = c.id
         <where>
+            <if test="communityId != null">AND c.id = #{communityId}</if>
             <if test="buildingId != null">AND u.building_id = #{buildingId}</if>
             <if test="status != null and status != ''">AND u.status = #{status}</if>
         </where>

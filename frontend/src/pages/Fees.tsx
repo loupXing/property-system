@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { Table, Button, Modal, Form, Input, InputNumber, Select, Tag, Space, Popconfirm, Tabs, message } from 'antd';
 import { PlusOutlined, DeleteOutlined, CheckOutlined } from '@ant-design/icons';
 import api from '../api';
+import { useCommunityFilter } from '../hooks/useCommunityFilter';
+import CommunityFilter from '../components/CommunityFilter';
 
 interface Bill {
   id: number;
@@ -27,6 +29,7 @@ interface FeeType {
 interface Unit { id: number; unit_number: string; building_name: string; community_name: string; }
 
 export default function Fees() {
+  const { communityId, setCommunityId, options, loading: communityLoading } = useCommunityFilter();
   const [bills, setBills] = useState<Bill[]>([]);
   const [feeTypes, setFeeTypes] = useState<FeeType[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
@@ -38,8 +41,10 @@ export default function Fees() {
   const [typeForm] = Form.useForm();
 
   const fetchBills = () => {
+    if (!communityId) return;
     setLoading(true);
-    const params = filterStatus ? { status: filterStatus } : {};
+    const params: Record<string, string | number> = { community_id: communityId };
+    if (filterStatus) params.status = filterStatus;
     api.get('/fees/bills', { params }).then(res => setBills(res.data)).finally(() => setLoading(false));
   };
 
@@ -47,11 +52,14 @@ export default function Fees() {
     api.get('/fees/types').then(res => setFeeTypes(res.data));
   };
 
-  useEffect(() => {
-    fetchBills();
-    fetchFeeTypes();
-    api.get('/units').then(res => setUnits(res.data));
-  }, [filterStatus]);
+  const fetchUnits = () => {
+    if (!communityId) return;
+    api.get('/units', { params: { community_id: communityId } }).then(res => setUnits(res.data));
+  };
+
+  useEffect(() => { fetchFeeTypes(); }, []);
+  useEffect(() => { fetchUnits(); }, [communityId]);
+  useEffect(() => { fetchBills(); }, [communityId, filterStatus]);
 
   const handleCreateBill = async () => {
     const values = await billForm.validateFields();
@@ -78,7 +86,7 @@ export default function Fees() {
   };
 
   const billColumns = [
-    { title: '小区', dataIndex: 'community_name', key: 'community_name' },
+    { title: '楼栋', dataIndex: 'building_name', key: 'building_name' },
     { title: '房号', dataIndex: 'unit_number', key: 'unit_number' },
     { title: '费用类型', dataIndex: 'fee_type_name', key: 'fee_type_name' },
     { title: '账期', dataIndex: 'period', key: 'period' },
@@ -111,7 +119,7 @@ export default function Fees() {
     <div>
       <div className="page-header">
         <h2>费用管理</h2>
-        <p>管理物业费、停车费等账单及费用类型</p>
+        <p>按小区管理物业费、停车费等账单</p>
       </div>
 
       <Tabs items={[
@@ -119,10 +127,13 @@ export default function Fees() {
           key: 'bills', label: '账单管理',
           children: (
             <>
-              <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between' }}>
-                <Select allowClear placeholder="筛选状态" style={{ width: 120 }} value={filterStatus} onChange={setFilterStatus}
-                  options={[{ value: '未缴', label: '未缴' }, { value: '已缴', label: '已缴' }]} />
-                <Button type="primary" icon={<PlusOutlined />} onClick={() => { billForm.resetFields(); setBillModalOpen(true); }}>生成账单</Button>
+              <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                <Space wrap>
+                  <CommunityFilter value={communityId} onChange={setCommunityId} options={options} loading={communityLoading} />
+                  <Select allowClear placeholder="筛选状态" style={{ width: 120 }} value={filterStatus} onChange={setFilterStatus}
+                    options={[{ value: '未缴', label: '未缴' }, { value: '已缴', label: '已缴' }]} />
+                </Space>
+                <Button type="primary" icon={<PlusOutlined />} disabled={!communityId} onClick={() => { billForm.resetFields(); setBillModalOpen(true); }}>生成账单</Button>
               </div>
               <Table columns={billColumns} dataSource={bills} rowKey="id" loading={loading} />
             </>
@@ -145,7 +156,7 @@ export default function Fees() {
         <Form form={billForm} layout="vertical">
           <Form.Item name="unit_id" label="房屋" rules={[{ required: true }]}>
             <Select showSearch optionFilterProp="label" placeholder="选择房屋"
-              options={units.map(u => ({ value: u.id, label: `${u.community_name} ${u.building_name} ${u.unit_number}` }))} />
+              options={units.map(u => ({ value: u.id, label: `${u.building_name} ${u.unit_number}` }))} />
           </Form.Item>
           <Form.Item name="fee_type_id" label="费用类型" rules={[{ required: true }]}>
             <Select placeholder="选择费用类型" options={feeTypes.map(t => ({ value: t.id, label: `${t.name} (${t.unit_price}${t.unit})` }))} />

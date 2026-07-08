@@ -9,6 +9,7 @@
         LEFT JOIN communities c ON b.community_id = c.id
         LEFT JOIN residents r ON ro.resident_id = r.id
         <where>
+            <if test="communityId != null">AND c.id = #{communityId}</if>
             <if test="status != null and status != ''">AND ro.status = #{status}</if>
             <if test="category != null and category != ''">AND ro.category = #{category}</if>
         </where>

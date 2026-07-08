@@ -7,7 +7,9 @@ import java.util.List;
 
 @Mapper
 public interface ResidentMapper {
-    List<Resident> findAll(@Param("unitId") Integer unitId, @Param("status") String status);
+    List<Resident> findAll(@Param("communityId") Integer communityId,
+                           @Param("unitId") Integer unitId,
+                           @Param("status") String status);
     Resident findById(Integer id);
     int insert(Resident resident);
     int update(Resident resident);

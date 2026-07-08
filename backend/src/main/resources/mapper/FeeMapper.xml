@@ -16,6 +16,7 @@
         JOIN communities c ON b.community_id = c.id
         JOIN fee_types ft ON bl.fee_type_id = ft.id
         <where>
+            <if test="communityId != null">AND c.id = #{communityId}</if>
             <if test="status != null and status != ''">AND bl.status = #{status}</if>
             <if test="unitId != null">AND bl.unit_id = #{unitId}</if>
         </where>

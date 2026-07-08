@@ -8,6 +8,7 @@
         LEFT JOIN buildings b ON u.building_id = b.id
         LEFT JOIN communities c ON b.community_id = c.id
         <where>
+            <if test="communityId != null">AND c.id = #{communityId}</if>
             <if test="unitId != null">AND r.unit_id = #{unitId}</if>
             <if test="status != null and status != ''">AND r.status = #{status}</if>
         </where>

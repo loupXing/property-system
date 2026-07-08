@@ -23,9 +23,10 @@ public class RepairController {
     }
 
     @GetMapping
-    public List<RepairOrder> list(@RequestParam(required = false) String status,
+    public List<RepairOrder> list(@RequestParam(required = false) Integer community_id,
+                                  @RequestParam(required = false) String status,
                                   @RequestParam(required = false) String category) {
-        return repairMapper.findAll(status, category);
+        return repairMapper.findAll(community_id, status, category);
     }
 
     @PostMapping

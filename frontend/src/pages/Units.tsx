@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { Table, Button, Modal, Form, Input, InputNumber, Select, Tag, Space, Popconfirm, message } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import api from '../api';
+import { useCommunityFilter } from '../hooks/useCommunityFilter';
+import CommunityFilter from '../components/CommunityFilter';
 
 interface Unit {
   id: number;
@@ -21,24 +23,36 @@ interface Building { id: number; name: string; community_name: string; }
 const statusColors: Record<string, string> = { '空置': 'default', '已入住': 'green', '装修中': 'orange' };
 
 export default function Units() {
+  const { communityId, setCommunityId, options, loading: communityLoading } = useCommunityFilter();
   const [data, setData] = useState<Unit[]>([]);
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Unit | null>(null);
   const [filterStatus, setFilterStatus] = useState<string | undefined>();
+  const [filterBuildingId, setFilterBuildingId] = useState<number | undefined>();
   const [form] = Form.useForm();
 
   const fetchData = () => {
+    if (!communityId) return;
     setLoading(true);
-    const params = filterStatus ? { status: filterStatus } : {};
+    const params: Record<string, string | number> = { community_id: communityId };
+    if (filterStatus) params.status = filterStatus;
+    if (filterBuildingId) params.building_id = filterBuildingId;
     api.get('/units', { params }).then(res => setData(res.data)).finally(() => setLoading(false));
   };
 
+  const fetchBuildings = () => {
+    if (!communityId) return;
+    api.get('/buildings', { params: { community_id: communityId } }).then(res => setBuildings(res.data));
+  };
+
   useEffect(() => {
-    fetchData();
-    api.get('/buildings').then(res => setBuildings(res.data));
-  }, [filterStatus]);
+    setFilterBuildingId(undefined);
+    fetchBuildings();
+  }, [communityId]);
+
+  useEffect(() => { fetchData(); }, [communityId, filterStatus, filterBuildingId]);
 
   const handleSubmit = async () => {
     const values = await form.validateFields();
@@ -60,7 +74,6 @@ export default function Units() {
   };
 
   const columns = [
-    { title: '小区', dataIndex: 'community_name', key: 'community_name' },
     { title: '楼栋', dataIndex: 'building_name', key: 'building_name' },
     { title: '房号', dataIndex: 'unit_number', key: 'unit_number' },
     { title: '楼层', dataIndex: 'floor', key: 'floor' },
@@ -84,11 +97,14 @@ export default function Units() {
   return (
     <div>
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div><h2>房屋管理</h2><p>管理所有房屋信息及入住状态</p></div>
-        <Space>
+        <div><h2>房屋管理</h2><p>按小区管理房屋信息及入住状态</p></div>
+        <Space wrap>
+          <CommunityFilter value={communityId} onChange={setCommunityId} options={options} loading={communityLoading} />
+          <Select allowClear placeholder="筛选楼栋" style={{ width: 140 }} value={filterBuildingId} onChange={setFilterBuildingId}
+            options={buildings.map(b => ({ value: b.id, label: b.name }))} />
           <Select allowClear placeholder="筛选状态" style={{ width: 120 }} value={filterStatus} onChange={setFilterStatus}
             options={[{ value: '空置', label: '空置' }, { value: '已入住', label: '已入住' }, { value: '装修中', label: '装修中' }]} />
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditing(null); form.resetFields(); setModalOpen(true); }}>新增房屋</Button>
+          <Button type="primary" icon={<PlusOutlined />} disabled={!communityId} onClick={() => { setEditing(null); form.resetFields(); setModalOpen(true); }}>新增房屋</Button>
         </Space>
       </div>
       <Table columns={columns} dataSource={data} rowKey="id" loading={loading} />
@@ -98,7 +114,7 @@ export default function Units() {
           {!editing && (
             <Form.Item name="building_id" label="所属楼栋" rules={[{ required: true }]}>
               <Select placeholder="选择楼栋" showSearch optionFilterProp="label"
-                options={buildings.map(b => ({ value: b.id, label: `${b.community_name} - ${b.name}` }))} />
+                options={buildings.map(b => ({ value: b.id, label: b.name }))} />
             </Form.Item>
           )}
           <Form.Item name="unit_number" label="房号" rules={[{ required: true }]}>

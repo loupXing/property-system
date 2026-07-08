@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { Table, Button, Modal, Form, Input, Select, Tag, Space, Popconfirm, message } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import api from '../api';
+import { useCommunityFilter } from '../hooks/useCommunityFilter';
+import CommunityFilter from '../components/CommunityFilter';
 
 interface Resident {
   id: number;
@@ -20,22 +22,30 @@ interface Resident {
 interface Unit { id: number; unit_number: string; building_name: string; community_name: string; }
 
 export default function Residents() {
+  const { communityId, setCommunityId, options, loading: communityLoading } = useCommunityFilter();
   const [data, setData] = useState<Resident[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Resident | null>(null);
+  const [filterStatus, setFilterStatus] = useState<string | undefined>();
   const [form] = Form.useForm();
 
   const fetchData = () => {
+    if (!communityId) return;
     setLoading(true);
-    api.get('/residents').then(res => setData(res.data)).finally(() => setLoading(false));
+    const params: Record<string, string | number> = { community_id: communityId };
+    if (filterStatus) params.status = filterStatus;
+    api.get('/residents', { params }).then(res => setData(res.data)).finally(() => setLoading(false));
   };
 
-  useEffect(() => {
-    fetchData();
-    api.get('/units').then(res => setUnits(res.data));
-  }, []);
+  const fetchUnits = () => {
+    if (!communityId) return;
+    api.get('/units', { params: { community_id: communityId } }).then(res => setUnits(res.data));
+  };
+
+  useEffect(() => { fetchUnits(); }, [communityId]);
+  useEffect(() => { fetchData(); }, [communityId, filterStatus]);
 
   const handleSubmit = async () => {
     const values = await form.validateFields();
@@ -59,7 +69,6 @@ export default function Residents() {
   const columns = [
     { title: '姓名', dataIndex: 'name', key: 'name' },
     { title: '电话', dataIndex: 'phone', key: 'phone' },
-    { title: '小区', dataIndex: 'community_name', key: 'community_name' },
     { title: '楼栋', dataIndex: 'building_name', key: 'building_name' },
     { title: '房号', dataIndex: 'unit_number', key: 'unit_number' },
     { title: '身份', dataIndex: 'type', key: 'type', render: (t: string) => <Tag color={t === '业主' ? 'blue' : 'cyan'}>{t}</Tag> },
@@ -81,8 +90,13 @@ export default function Residents() {
   return (
     <div>
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div><h2>住户管理</h2><p>管理业主和租户信息</p></div>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditing(null); form.resetFields(); setModalOpen(true); }}>新增住户</Button>
+        <div><h2>住户管理</h2><p>按小区管理业主和租户信息</p></div>
+        <Space wrap>
+          <CommunityFilter value={communityId} onChange={setCommunityId} options={options} loading={communityLoading} />
+          <Select allowClear placeholder="筛选状态" style={{ width: 120 }} value={filterStatus} onChange={setFilterStatus}
+            options={[{ value: '在住', label: '在住' }, { value: '搬离', label: '搬离' }]} />
+          <Button type="primary" icon={<PlusOutlined />} disabled={!communityId} onClick={() => { setEditing(null); form.resetFields(); setModalOpen(true); }}>新增住户</Button>
+        </Space>
       </div>
       <Table columns={columns} dataSource={data} rowKey="id" loading={loading} />
 
@@ -96,7 +110,7 @@ export default function Residents() {
           </Form.Item>
           <Form.Item name="unit_id" label="所属房屋">
             <Select allowClear placeholder="选择房屋" showSearch optionFilterProp="label"
-              options={units.map(u => ({ value: u.id, label: `${u.community_name} ${u.building_name} ${u.unit_number}` }))} />
+              options={units.map(u => ({ value: u.id, label: `${u.building_name} ${u.unit_number}` }))} />
           </Form.Item>
           <Form.Item name="id_card" label="身份证号">
             <Input placeholder="请输入身份证号" />
